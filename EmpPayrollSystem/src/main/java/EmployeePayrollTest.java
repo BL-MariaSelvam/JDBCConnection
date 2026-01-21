@@ -39,7 +39,7 @@ public class EmployeePayrollTest {
             List<EmployeePayroll> employees = dbService.getEmployeesByDateRange(start, end);
 
             employees.forEach(System.out::println);
-
+            dbService.getSalaryStatisticsByGender();
         } catch (PayrollDBException e) {
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();

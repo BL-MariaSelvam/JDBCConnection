@@ -192,4 +192,42 @@ public class EmployeePayrollDBService {
             throw new PayrollDBException("Error updating employee salary for " + empName, e);
         }
     }
-}
+            public void getSalaryStatisticsByGender() throws PayrollDBException {
+                String sql = "SELECT gender, " +
+                             "SUM(netPay) AS totalSalary, " +
+                             "AVG(netPay) AS averageSalary, " +
+                             "MIN(netPay) AS minSalary, " +
+                             "MAX(netPay) AS maxSalary, " +
+                             "COUNT(*) AS employeeCount " +
+                             "FROM employee e " +
+                             "JOIN payroll p ON e.empId = p.empId " +
+                             "GROUP BY gender";
+
+                try (PreparedStatement stmt = connection.prepareStatement(sql);
+                     ResultSet rs = stmt.executeQuery()) {
+
+                    System.out.println("Gender-wise Salary Statistics:");
+                    while (rs.next()) {
+                        String gender = rs.getString("gender");
+                        double sum = rs.getDouble("totalSalary");
+                        double avg = rs.getDouble("averageSalary");
+                        double min = rs.getDouble("minSalary");
+                        double max = rs.getDouble("maxSalary");
+                        int count = rs.getInt("employeeCount");
+
+                        System.out.println("Gender: " + gender);
+                        System.out.println("  Total Salary: " + sum);
+                        System.out.println("  Average Salary: " + avg);
+                        System.out.println("  Min Salary: " + min);
+                        System.out.println("  Max Salary: " + max);
+                        System.out.println("  Number of Employees: " + count);
+                        System.out.println("------------------------------");
+                    }
+
+                } catch (SQLException e) {
+                    throw new PayrollDBException("Error retrieving salary statistics by gender", e);
+                }
+            }
+
+    }
+
