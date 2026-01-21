@@ -26,7 +26,47 @@ public class EmployeePayroll {
         this.netPay = netPay;
     }
 
-    @Override
+    public int getEmpId() {
+		return empId;
+	}
+
+	public void setEmpId(int empId) {
+		this.empId = empId;
+	}
+
+	public String getEmpName() {
+		return empName;
+	}
+
+	public void setEmpName(String empName) {
+		this.empName = empName;
+	}
+
+	public String getGender() {
+		return gender;
+	}
+
+	public void setGender(String gender) {
+		this.gender = gender;
+	}
+
+	public LocalDate getStartDate() {
+		return startDate;
+	}
+
+	public void setStartDate(LocalDate startDate) {
+		this.startDate = startDate;
+	}
+
+	public double getNetPay() {
+		return netPay;
+	}
+
+	public void setNetPay(double netPay) {
+		this.netPay = netPay;
+	}
+
+	@Override
     public String toString() {
         return "EmployeePayroll{" +
                 "empId=" + empId +
