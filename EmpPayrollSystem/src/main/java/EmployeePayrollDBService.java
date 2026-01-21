@@ -315,7 +315,138 @@ public class EmployeePayrollDBService {
         }
     }
 
-            public void getSalaryStatisticsByGender() throws PayrollDBException {
+    
+    public EmployeePayroll addEmployeePayroll(EmployeePayroll emp)
+            throws PayrollDBException {
+
+        String insertEmployeeSQL =
+                "INSERT INTO employee (empName, gender, startDate) VALUES (?, ?, ?)";
+
+        String insertAddressSQL =
+                "INSERT INTO address (empId, street, city, state, zip) VALUES (?, ?, ?, ?, ?)";
+
+        String insertDeptSQL =
+                "INSERT INTO employee_department (empId, deptId) VALUES (?, ?)";
+
+        String insertPayrollSQL =
+                "INSERT INTO payroll (empId, basicPay, deductions, taxablePay, incomeTax, netPay) " +
+                "VALUES (?, ?, ?, ?, ?, ?)";
+
+        Connection conn = null;
+
+        try {
+            conn = DriverManager.getConnection(JDBC_URL, USER, PASSWORD);
+            conn.setAutoCommit(false); // 🔴 START TRANSACTION
+
+            int empId;
+
+            // 1️⃣ Insert Employee
+            try (PreparedStatement empStmt =
+                         conn.prepareStatement(insertEmployeeSQL, PreparedStatement.RETURN_GENERATED_KEYS)) {
+
+                empStmt.setString(1, emp.getEmpName());
+                empStmt.setString(2, emp.getGender());
+                empStmt.setDate(3, Date.valueOf(emp.getStartDate()));
+                empStmt.executeUpdate();
+
+                ResultSet rs = empStmt.getGeneratedKeys();
+                if (!rs.next()) {
+                    throw new PayrollDBException("Employee ID generation failed");
+                }
+                empId = rs.getInt(1);
+            }
+
+            // 2️⃣ Insert Address
+            try (PreparedStatement addrStmt = conn.prepareStatement(insertAddressSQL)) {
+                addrStmt.setInt(1, empId);
+                addrStmt.setString(2, emp.getStreet());
+                addrStmt.setString(3, emp.getCity());
+                addrStmt.setString(4, emp.getState());
+                addrStmt.setString(5, emp.getZip());
+                addrStmt.executeUpdate();
+            }
+
+            // 3️⃣ Insert Departments
+            for (String deptName : emp.getDepartments()) {
+                int deptId = getDepartmentId(deptName, conn);
+                try (PreparedStatement deptStmt = conn.prepareStatement(insertDeptSQL)) {
+                    deptStmt.setInt(1, empId);
+                    deptStmt.setInt(2, deptId);
+                    deptStmt.executeUpdate();
+                }
+            }
+
+            // 4️⃣ Payroll Calculations
+            double basicPay = emp.getBasicPay();
+            double deductions = basicPay * 0.20;
+            double taxablePay = basicPay - deductions;
+            double incomeTax = taxablePay * 0.10;
+            double netPay = basicPay - incomeTax;
+
+            // 5️⃣ Insert Payroll
+            try (PreparedStatement payrollStmt = conn.prepareStatement(insertPayrollSQL)) {
+                payrollStmt.setInt(1, empId);
+                payrollStmt.setDouble(2, basicPay);
+                payrollStmt.setDouble(3, deductions);
+                payrollStmt.setDouble(4, taxablePay);
+                payrollStmt.setDouble(5, incomeTax);
+                payrollStmt.setDouble(6, netPay);
+                payrollStmt.executeUpdate();
+            }
+
+            conn.commit(); // ✅ TRANSACTION SUCCESS
+
+            // 🔵 Update object ONLY after successful commit
+            emp.setEmpId(empId);
+            emp.setDeductions(deductions);
+            emp.setTaxablePay(taxablePay);
+            emp.setIncomeTax(incomeTax);
+            emp.setNetPay(netPay);
+
+            return emp;
+
+        } catch (Exception e) {
+            try {
+                if (conn != null) conn.rollback(); // 🔁 ROLLBACK
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+            throw new PayrollDBException("Failed to add employee payroll", e);
+
+        } finally {
+            try {
+                if (conn != null) conn.setAutoCommit(true);
+                if (conn != null) conn.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private int getDepartmentId(String deptName, Connection conn)
+            throws SQLException {
+
+        String selectSQL = "SELECT deptId FROM department WHERE deptName = ?";
+        String insertSQL = "INSERT INTO department (deptName) VALUES (?)";
+
+        try (PreparedStatement stmt = conn.prepareStatement(selectSQL)) {
+            stmt.setString(1, deptName);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getInt("deptId");
+        }
+
+        try (PreparedStatement stmt =
+                     conn.prepareStatement(insertSQL, PreparedStatement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, deptName);
+            stmt.executeUpdate();
+            ResultSet rs = stmt.getGeneratedKeys();
+            rs.next();
+            return rs.getInt(1);
+        }
+    }
+
+
+			public void getSalaryStatisticsByGender() throws PayrollDBException {
                 String sql = "SELECT gender, " +
                              "SUM(netPay) AS totalSalary, " +
                              "AVG(netPay) AS averageSalary, " +
