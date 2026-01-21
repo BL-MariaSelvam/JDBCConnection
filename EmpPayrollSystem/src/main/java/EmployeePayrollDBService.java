@@ -192,6 +192,61 @@ public class EmployeePayrollDBService {
             throw new PayrollDBException("Error updating employee salary for " + empName, e);
         }
     }
+    
+    public EmployeePayroll addEmployee(EmployeePayroll newEmp) throws PayrollDBException {
+        // Insert SQL for employee table
+        String insertEmployeeSQL = "INSERT INTO employee (empName, gender, startDate) VALUES (?, ?, ?)";
+        // Insert SQL for payroll table
+        String insertPayrollSQL = "INSERT INTO payroll (empId, netPay) VALUES (?, ?)";
+
+        try (Connection conn = DriverManager.getConnection(JDBC_URL, USER, PASSWORD)) {
+            conn.setAutoCommit(false); // Start transaction
+
+            int generatedEmpId = -1;
+
+            // 1️⃣ Insert into employee table
+            try (PreparedStatement empStmt = conn.prepareStatement(insertEmployeeSQL, PreparedStatement.RETURN_GENERATED_KEYS)) {
+                empStmt.setString(1, newEmp.getEmpName());
+                empStmt.setString(2, newEmp.getGender());
+                empStmt.setDate(3, newEmp.getStartDate() != null ? Date.valueOf(newEmp.getStartDate()) : null);
+
+                int rows = empStmt.executeUpdate();
+                if (rows == 0) {
+                    throw new PayrollDBException("Failed to insert employee: " + newEmp.getEmpName());
+                }
+
+                // Get generated empId
+                try (ResultSet rs = empStmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        generatedEmpId = rs.getInt(1);
+                    } else {
+                        throw new PayrollDBException("Failed to retrieve employee ID after insert");
+                    }
+                }
+            }
+
+            // 2️⃣ Insert into payroll table
+            try (PreparedStatement payrollStmt = conn.prepareStatement(insertPayrollSQL)) {
+                payrollStmt.setInt(1, generatedEmpId);
+                payrollStmt.setDouble(2, newEmp.getNetPay());
+
+                int rows = payrollStmt.executeUpdate();
+                if (rows == 0) {
+                    throw new PayrollDBException("Failed to insert payroll for employee: " + newEmp.getEmpName());
+                }
+            }
+
+            // 3️⃣ Commit transaction
+            conn.commit();
+
+            // 4️⃣ Return EmployeePayroll object with generated empId
+            return new EmployeePayroll(generatedEmpId, newEmp.getEmpName(), newEmp.getGender(), newEmp.getStartDate(), newEmp.getNetPay());
+
+        } catch (SQLException e) {
+            throw new PayrollDBException("Error adding new employee: " + newEmp.getEmpName(), e);
+        }
+    }
+
             public void getSalaryStatisticsByGender() throws PayrollDBException {
                 String sql = "SELECT gender, " +
                              "SUM(netPay) AS totalSalary, " +

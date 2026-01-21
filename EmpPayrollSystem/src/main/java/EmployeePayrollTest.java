@@ -40,6 +40,20 @@ public class EmployeePayrollTest {
 
             employees.forEach(System.out::println);
             dbService.getSalaryStatisticsByGender();
+            
+            // Create new employee object
+            EmployeePayroll newEmp = new EmployeePayroll(0, "Terissa", "F", LocalDate.of(2023, 1, 15), 5000000.00);
+
+            // Add employee to DB and get updated object with empId
+            EmployeePayroll addedEmp = dbService.addEmployee(newEmp);
+
+            System.out.println("Added Employee Payroll: " + addedEmp);
+
+            // Optional: Retrieve from DB to verify
+            dbService.getEmployeePayrollByName("Terissa")
+                     .forEach(System.out::println);
+
+            
         } catch (PayrollDBException e) {
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
