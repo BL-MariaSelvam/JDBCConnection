@@ -422,6 +422,26 @@ public class EmployeePayrollDBService {
             }
         }
     }
+    public boolean removeEmployeeFromPayroll(String empName)
+            throws PayrollDBException {
+
+        String sql = "UPDATE employee SET is_active = FALSE WHERE empName = ?";
+
+        try (Connection conn = DriverManager.getConnection(JDBC_URL, USER, PASSWORD);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, empName);
+            int rowsAffected = stmt.executeUpdate();
+
+            if (rowsAffected == 0) {
+                throw new PayrollDBException("Employee not found: " + empName);
+            }
+            return true;
+
+        } catch (Exception e) {
+            throw new PayrollDBException("Failed to remove employee: " + empName, e);
+        }
+    }
 
     private int getDepartmentId(String deptName, Connection conn)
             throws SQLException {
