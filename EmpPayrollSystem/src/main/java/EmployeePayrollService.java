@@ -6,13 +6,12 @@ public class EmployeePayrollService {
 
     private EmployeePayrollDBService dbService;
 
-    public EmployeePayrollService() {
-        this.dbService = new EmployeePayrollDBService();
+    // Constructor declares throws
+    public EmployeePayrollService() throws PayrollDBException {
+        this.dbService = EmployeePayrollDBService.getInstance();
     }
 
-    public List<EmployeePayroll> getEmployeePayrollData()
-            throws PayrollDBException {
+    public List<EmployeePayroll> getEmployeePayrollData() throws PayrollDBException {
         return dbService.readEmployeePayrollData();
     }
 }
-

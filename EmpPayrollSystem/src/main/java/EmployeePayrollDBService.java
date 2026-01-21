@@ -1,10 +1,13 @@
 package main.java;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+
 import java.util.List;
 
 public class EmployeePayrollDBService {
@@ -13,7 +16,70 @@ public class EmployeePayrollDBService {
             "jdbc:mysql://localhost:3306/employeepayrollsystem?useSSL=false";
     private static final String USER = "root";
     private static final String PASSWORD = "root";
+    
+    private static EmployeePayrollDBService instance; // Singleton instance
+    private Connection connection;
+    private PreparedStatement retrieveByNameStmt; // Cached PreparedStatement
 
+ // Private constructor for Singleton
+    private EmployeePayrollDBService() throws PayrollDBException {
+        try {
+            this.connection = DriverManager.getConnection(JDBC_URL, USER, PASSWORD);
+            // Prepare and cache PreparedStatement
+            this.retrieveByNameStmt = connection.prepareStatement(
+                    "SELECT e.empId, e.empName, e.gender, e.startDate, p.netPay " +
+                    "FROM employee e " +
+                    "JOIN payroll p ON e.empId = p.empId " +
+                    "WHERE e.empName = ?"
+            );
+        } catch (SQLException e) {
+            throw new PayrollDBException("Failed to initialize DB connection or prepare statement", e);
+        }
+    }
+
+    // Public method to get Singleton instance
+    public static EmployeePayrollDBService getInstance() throws PayrollDBException {
+        if (instance == null) {
+            instance = new EmployeePayrollDBService();
+        }
+        return instance;
+    }
+
+    // Retrieve employee payroll by name
+    public List<EmployeePayroll> getEmployeePayrollByName(String empName) throws PayrollDBException {
+        List<EmployeePayroll> payrollList = new ArrayList<>();
+        try {
+            retrieveByNameStmt.setString(1, empName);
+            try (ResultSet rs = retrieveByNameStmt.executeQuery()) { // Reuse ResultSet
+                while (rs.next()) {
+                    int empId = rs.getInt("empId");
+                    String name = rs.getString("empName");
+                    String gender = rs.getString("gender");
+                    Date startDateSQL = rs.getDate("startDate");
+                    LocalDate startDate = null;
+                    if (startDateSQL != null) {
+                        startDate = startDateSQL.toLocalDate();
+                    }
+                    double netPay = rs.getDouble("netPay");
+
+                    payrollList.add(new EmployeePayroll(empId, name, gender, startDate, netPay));
+                }
+            }
+        } catch (SQLException e) {
+            throw new PayrollDBException("Error retrieving payroll data for " + empName, e);
+        }
+        return payrollList;
+    }
+
+    // Close resources
+    public void close() {
+        try {
+            if (retrieveByNameStmt != null) retrieveByNameStmt.close();
+            if (connection != null) connection.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
     public List<EmployeePayroll> readEmployeePayrollData()
             throws PayrollDBException {
 
