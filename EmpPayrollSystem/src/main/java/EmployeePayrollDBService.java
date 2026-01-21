@@ -144,6 +144,74 @@ public class EmployeePayrollDBService {
         }
         return payrollList;
     }
+    
+    public EmployeePayroll addEmployeeWithPayrollDetails(EmployeePayroll newEmp) throws PayrollDBException {
+        String insertEmployeeSQL = "INSERT INTO employee (empName, gender, startDate) VALUES (?, ?, ?)";
+        String insertPayrollDetailsSQL = "INSERT INTO payroll (empId, basicPay, deductions, taxablePay, incomeTax, netPay) VALUES (?, ?, ?, ?, ?, ?)";
+        String insertPayrollSQL = "INSERT INTO payroll (empId, netPay) VALUES (?, ?)"; // For backward compatibility
+
+        try (Connection conn = DriverManager.getConnection(JDBC_URL, USER, PASSWORD)) {
+            conn.setAutoCommit(false); // Start transaction
+
+            int generatedEmpId = -1;
+
+            // 1️⃣ Insert employee
+            try (PreparedStatement empStmt = conn.prepareStatement(insertEmployeeSQL, PreparedStatement.RETURN_GENERATED_KEYS)) {
+                empStmt.setString(1, newEmp.getEmpName());
+                empStmt.setString(2, newEmp.getGender());
+                empStmt.setDate(3, newEmp.getStartDate() != null ? Date.valueOf(newEmp.getStartDate()) : null);
+
+                int rows = empStmt.executeUpdate();
+                if (rows == 0) throw new PayrollDBException("Failed to insert employee: " + newEmp.getEmpName());
+
+                try (ResultSet rs = empStmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        generatedEmpId = rs.getInt(1);
+                    } else {
+                        throw new PayrollDBException("Failed to retrieve employee ID after insert");
+                    }
+                }
+            }
+
+            // 2️⃣ Calculate derived payroll fields
+            double basicPay = newEmp.getNetPay(); // Assuming netPay passed in object is the basic salary
+            double deductions = basicPay * 0.2;
+            double taxablePay = basicPay - deductions;
+            double incomeTax = taxablePay * 0.1;
+            double netPay = basicPay - incomeTax;
+
+            // 3️⃣ Insert into payroll_details
+            try (PreparedStatement payrollDetailsStmt = conn.prepareStatement(insertPayrollDetailsSQL)) {
+                payrollDetailsStmt.setInt(1, generatedEmpId);
+                payrollDetailsStmt.setDouble(2, basicPay);
+                payrollDetailsStmt.setDouble(3, deductions);
+                payrollDetailsStmt.setDouble(4, taxablePay);
+                payrollDetailsStmt.setDouble(5, incomeTax);
+                payrollDetailsStmt.setDouble(6, netPay);
+
+                int rows = payrollDetailsStmt.executeUpdate();
+                if (rows == 0) throw new PayrollDBException("Failed to insert payroll details for employee: " + newEmp.getEmpName());
+            }
+
+            // 4️⃣ Insert into payroll table (backward compatibility)
+            try (PreparedStatement payrollStmt = conn.prepareStatement(insertPayrollSQL)) {
+                payrollStmt.setInt(1, generatedEmpId);
+                payrollStmt.setDouble(2, netPay);
+
+                int rows = payrollStmt.executeUpdate();
+                if (rows == 0) throw new PayrollDBException("Failed to insert payroll for employee: " + newEmp.getEmpName());
+            }
+
+            conn.commit(); // ✅ commit transaction
+
+            // 5️⃣ Return updated EmployeePayroll object with calculated netPay
+            return new EmployeePayroll(generatedEmpId, newEmp.getEmpName(), newEmp.getGender(), newEmp.getStartDate(), netPay);
+
+        } catch (SQLException e) {
+            throw new PayrollDBException("Error adding employee with payroll details: " + newEmp.getEmpName(), e);
+        }
+    }
+
 
     // Update salary for a given employee and sync object
     public EmployeePayroll updateEmployeeSalary(String empName, double newSalary) throws PayrollDBException {

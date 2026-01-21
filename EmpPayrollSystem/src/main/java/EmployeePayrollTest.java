@@ -39,6 +39,18 @@ public class EmployeePayrollTest {
             List<EmployeePayroll> employees = dbService.getEmployeesByDateRange(start, end);
 
             employees.forEach(System.out::println);
+            
+            EmployeePayroll newEmp1 = new EmployeePayroll(0, "Terissa", "F", LocalDate.of(2023, 2, 10), 5000000.00);
+
+            EmployeePayroll addedEmp1 = dbService.addEmployeeWithPayrollDetails(newEmp1);
+
+            System.out.println("Added Employee with Payroll Details: " + addedEmp1);
+
+            // Verify by retrieving from DB
+            dbService.getEmployeePayrollByName("Terissa")
+                     .forEach(System.out::println);
+
+            
             dbService.getSalaryStatisticsByGender();
             
             // Create new employee object
